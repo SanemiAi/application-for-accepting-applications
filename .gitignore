@@ -1,0 +1,26 @@
+# Виртуальное окружение
+venv/
+.venv/
+env/
+
+# Кэш Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Локальные секреты и окружение
+.env
+*.local
+
+# Служебные файлы ОС
+.DS_Store
+Thumbs.db
+
+# Логи
+*.log
