@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}{{ ticket.number }}{% endblock %}
+{% block content %}
+<p><a href="/">← ко всем заявкам</a></p>
+
+{% if error %}
+<div class="alert">⚠ {{ error }}</div>
+{% endif %}
+
+<div class="card">
+  <h2>{{ ticket.number }} — {{ ticket.subject }}</h2>
+  <div class="field"><b>Статус:</b> <span class="badge {{ ticket.status }}">{{ labels[ticket.status] }}</span></div>
+  <div class="field"><b>Категория:</b> {{ ticket.category.name if ticket.category else "—" }}</div>
+  <div class="field"><b>Заявитель:</b> {{ ticket.applicant.full_name or ticket.applicant.username }}</div>
+  <div class="field"><b>Исполнитель:</b> {{ ticket.executor.full_name if ticket.executor else "не назначен" }}</div>
+  <div class="field"><b>Подана:</b> {{ ticket.created_at.strftime("%d.%m.%Y %H:%M") }}</div>
+  <hr>
+  <p style="white-space:pre-wrap">{{ ticket.description }}</p>
+  {% if user.role in ("operator", "admin") or ticket.applicant_id == user.id %}
+  <p><a class="btn btn-gray" href="/tickets/{{ ticket.number }}/edit">Редактировать</a></p>
+  {% endif %}
+</div>
+
+{% if user.role in ("operator", "admin") %}
+<div class="card">
+  <h3>Назначение исполнителя</h3>
+  {% if executors %}
+  <form method="post" action="/tickets/{{ ticket.number }}/assign" class="inline-form">
+    <select name="executor_id">
+      {% for e in executors %}
+      <option value="{{ e.id }}" {% if ticket.executor_id == e.id %}selected{% endif %}>{{ e.full_name or e.username }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit">Назначить</button>
+  </form>
+  {% else %}
+  <p class="muted">Нет пользователей с ролью «Исполнитель». Создайте их в панели администратора (Swagger: /admin/users).</p>
+  {% endif %}
+</div>
+{% endif %}
+
+<div class="card">
+  <h3>Действия</h3>
+  {% set is_executor_owner = user.role == "executor" and ticket.executor_id == user.id %}
+  {% set is_applicant_owner = user.role == "applicant" and ticket.applicant_id == user.id %}
+
+  {% if user.role == "executor" and ticket.status == "new" and (ticket.executor_id is none or ticket.executor_id == user.id) %}
+  <form method="post" action="/tickets/{{ ticket.number }}/take" style="margin-bottom:10px">
+    <button class="btn-green" type="submit">Взять в работу</button>
+  </form>
+  {% endif %}
+
+  {% if is_executor_owner and ticket.status == "in_work" %}
+  <form method="post" action="/tickets/{{ ticket.number }}/complete" style="margin-bottom:10px">
+    <textarea name="text" placeholder="Комментарий о выполнении (необязательно)"></textarea>
+    <button class="btn-green" type="submit">Отметить выполненной</button>
+  </form>
+  {% endif %}
+
+  {% if ticket.status == "done" and (user.role in ("operator", "admin") or is_applicant_owner) %}
+  <form method="post" action="/tickets/{{ ticket.number }}/close"
+        onsubmit="return confirm('Закрыть заявку? Это действие нельзя отменить.')">
+    <button class="btn-red" type="submit">Закрыть заявку</button>
+  </form>
+  {% endif %}
+
+  {% if not (user.role == "executor" and ticket.status == "new" and (ticket.executor_id is none or ticket.executor_id == user.id))
+        and not (is_executor_owner and ticket.status == "in_work")
+        and not (ticket.status == "done" and (user.role in ("operator", "admin") or is_applicant_owner)) %}
+  <p class="muted">Сейчас вам доступны только комментарии{% if user.role in ("operator", "admin") or is_applicant_owner %} и редактирование{% endif %}.</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h3>Комментарии</h3>
+  {% if ticket.comments %}
+    {% for c in ticket.comments %}
+    <div class="comment">
+      <div class="muted">{{ c.author.full_name or c.author.username }} · {{ c.created_at.strftime("%d.%m.%Y %H:%M") }}</div>
+      <div style="white-space:pre-wrap">{{ c.text }}</div>
+    </div>
+    {% endfor %}
+  {% else %}
+    <p class="muted">Комментариев нет.</p>
+  {% endif %}
+  <form method="post" action="/tickets/{{ ticket.number }}/comments">
+    <textarea name="text" placeholder="Добавить комментарий..." required></textarea>
+    <button>Отправить</button>
+  </form>
+</div>
+{% endblock %}

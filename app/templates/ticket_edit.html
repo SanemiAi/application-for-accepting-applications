@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Редактирование {{ ticket.number }}{% endblock %}
+{% block content %}
+<p><a href="/tickets/{{ ticket.number }}">← к заявке</a></p>
+
+{% if error %}
+<div class="alert">⚠ {{ error }}</div>
+{% endif %}
+
+<div class="card">
+  <h2>Редактирование {{ ticket.number }}</h2>
+  <div class="field"><b>Статус:</b> <span class="badge {{ ticket.status }}">{{ labels[ticket.status] }}</span></div>
+
+  {% if user.role == "applicant" %}
+  <form method="post" action="/tickets/{{ ticket.number }}/edit">
+    <label>Дополнить описание</label>
+    <textarea name="description" placeholder="Новый текст будет добавлен к существующему описанию..." required></textarea>
+    <button type="submit">Дополнить</button>
+    <a class="btn btn-gray" href="/tickets/{{ ticket.number }}">Отмена</a>
+  </form>
+  <div class="field" style="margin-top:16px"><b>Текущее описание:</b></div>
+  <p class="muted" style="white-space:pre-wrap">{{ ticket.description }}</p>
+  {% else %}
+  <form method="post" action="/tickets/{{ ticket.number }}/edit">
+    <label>Тема</label>
+    <input type="text" name="subject" value="{{ ticket.subject }}" required>
+    <label>Категория</label>
+    <select name="category_id">
+      <option value="">— без категории —</option>
+      {% for c in categories %}
+      <option value="{{ c.id }}" {% if ticket.category_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+      {% endfor %}
+    </select>
+    <label>Описание</label>
+    <textarea name="description" required>{{ ticket.description }}</textarea>
+    <button type="submit">Сохранить</button>
+    <a class="btn btn-gray" href="/tickets/{{ ticket.number }}">Отмена</a>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Заявки{% endblock %}
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center">
+  <h2>Заявки</h2>
+  {% if user.role != "executor" %}
+  <a class="btn" href="/tickets/new">+ Новая заявка</a>
+  {% endif %}
+</div>
+
+<div class="card">
+  <form method="get" action="/" class="filters">
+    <input type="text" name="q" value="{{ f_q }}" placeholder="Поиск по номеру или теме...">
+    <select name="status">
+      <option value="">Все статусы</option>
+      {% for code, label in labels.items() %}
+      <option value="{{ code }}" {% if f_status == code %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    <select name="category_id">
+      <option value="">Все категории</option>
+      {% for c in categories %}
+      <option value="{{ c.id }}" {% if f_category_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit">Найти</button>
+    <a class="btn btn-gray" href="/">Сбросить</a>
+  </form>
+</div>
+
+{% if tickets %}
+<table>
+  <tr>
+    <th>Номер</th><th>Тема</th><th>Категория</th><th>Статус</th><th>Подана</th><th>Исполнитель</th>
+  </tr>
+  {% for t in tickets %}
+  <tr>
+    <td><a href="/tickets/{{ t.number }}">{{ t.number }}</a></td>
+    <td>{{ t.subject }}</td>
+    <td>{{ t.category.name if t.category else "—" }}</td>
+    <td><span class="badge {{ t.status }}">{{ labels[t.status] }}</span></td>
+    <td class="muted">{{ t.created_at.strftime("%d.%m.%Y %H:%M") }}</td>
+    <td>{{ t.executor.full_name if t.executor else "—" }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<div class="card">
+  {% if f_q or f_status or f_category_id %}
+  <p class="muted">По заданным условиям ничего не найдено. <a href="/">Сбросить фильтры</a></p>
+  {% else %}
+  <p class="muted">Заявок пока нет.</p>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}
