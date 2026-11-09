@@ -95,6 +95,7 @@ def index(
     request: Request,
     status: Optional[str] = None,
     category_id: Optional[int] = None,
+    priority: Optional[str] = None,
     q: Optional[str] = None,
     user: Optional[models.User] = Depends(get_web_user),
     db: Session = Depends(get_db),
@@ -110,10 +111,14 @@ def index(
         query = query.filter(models.Ticket.status == status)
     if category_id:
         query = query.filter(models.Ticket.category_id == category_id)
+    if priority in models.Priority.ALL:
+        query = query.filter(models.Ticket.priority == priority)
     if q:
         like = f"%{q.strip()}%"
         query = query.filter(
-            models.Ticket.subject.ilike(like) | models.Ticket.number.ilike(like)
+            models.Ticket.subject.ilike(like)
+            | models.Ticket.number.ilike(like)
+            | models.Ticket.description.ilike(like)
         )
     tickets = query.order_by(models.Ticket.created_at.desc()).all()
     categories = db.query(models.Category).order_by(models.Category.name).all()
@@ -121,13 +126,16 @@ def index(
         request,
         "tickets.html",
         ctx(user, tickets=tickets, labels=models.Status.LABELS,
-            categories=categories, f_status=status, f_category_id=category_id, f_q=q or ""),
+            priorities=models.Priority.LABELS,
+            categories=categories, f_status=status, f_category_id=category_id,
+            f_priority=priority, f_q=q or ""),
     )
 
 
 @router.get("/tickets/new", response_class=HTMLResponse)
 def new_ticket_page(
     request: Request,
+    error: Optional[str] = None,
     user: Optional[models.User] = Depends(get_web_user),
     db: Session = Depends(get_db),
 ):
@@ -136,7 +144,10 @@ def new_ticket_page(
     if user.role == models.Role.EXECUTOR:
         raise HTTPException(403, "Исполнитель не может подавать заявки")
     categories = db.query(models.Category).order_by(models.Category.name).all()
-    return templates.TemplateResponse(request, "ticket_new.html", ctx(user, categories=categories))
+    return templates.TemplateResponse(
+        request, "ticket_new.html",
+        ctx(user, categories=categories, priorities=models.Priority.LABELS, error=error),
+    )
 
 
 @router.post("/tickets/new")
@@ -145,6 +156,7 @@ def create_ticket(
     subject: str = Form(...),
     description: str = Form(...),
     category_id: Optional[int] = Form(None),
+    priority: str = Form(models.Priority.MEDIUM),
     user: Optional[models.User] = Depends(get_web_user),
     db: Session = Depends(get_db),
 ):
@@ -152,11 +164,20 @@ def create_ticket(
         return RedirectResponse("/login", status_code=303)
     if user.role == models.Role.EXECUTOR:
         raise HTTPException(403, "Исполнитель не может подавать заявки")
+    if len(subject.strip()) < 3:
+        from urllib.parse import quote
+        return RedirectResponse("/tickets/new?error=" + quote("Тема должна содержать минимум 3 символа"), status_code=303)
+    if not description.strip():
+        from urllib.parse import quote
+        return RedirectResponse("/tickets/new?error=" + quote("Описание не может быть пустым"), status_code=303)
+    if priority not in models.Priority.ALL:
+        priority = models.Priority.MEDIUM
     if category_id and not db.get(models.Category, category_id):
         raise HTTPException(400, "Категория не найдена")
     ticket = models.Ticket(
-        number="tmp", subject=subject, description=description,
-        category_id=category_id, applicant_id=user.id, status=models.Status.NEW,
+        number="tmp", subject=subject.strip(), description=description.strip(),
+        category_id=category_id, priority=priority,
+        applicant_id=user.id, status=models.Status.NEW,
     )
     db.add(ticket)
     db.flush()
@@ -189,7 +210,8 @@ def ticket_detail(
     return templates.TemplateResponse(
         request,
         "ticket_detail.html",
-        ctx(user, ticket=ticket, labels=models.Status.LABELS, error=error, **extra),
+        ctx(user, ticket=ticket, labels=models.Status.LABELS,
+            priorities=models.Priority.LABELS, error=error, **extra),
     )
 
 
@@ -213,7 +235,8 @@ def edit_ticket_page(
     return templates.TemplateResponse(
         request,
         "ticket_edit.html",
-        ctx(user, ticket=ticket, categories=categories, labels=models.Status.LABELS, error=error),
+        ctx(user, ticket=ticket, categories=categories, labels=models.Status.LABELS,
+            priorities=models.Priority.LABELS, error=error),
     )
 
 
@@ -224,6 +247,7 @@ def edit_ticket(
     subject: Optional[str] = Form(None),
     description: Optional[str] = Form(None),
     category_id: Optional[int] = Form(None),
+    priority: Optional[str] = Form(None),
     user: Optional[models.User] = Depends(get_web_user),
     db: Session = Depends(get_db),
 ):
@@ -238,6 +262,8 @@ def edit_ticket(
             ticket.description += "\n\n[Дополнено заявителем] " + description.strip()
     elif user.role in (models.Role.OPERATOR, models.Role.ADMIN):
         if subject and subject.strip():
+            if len(subject.strip()) < 3:
+                return _back(number, "Тема должна содержать минимум 3 символа")
             ticket.subject = subject.strip()
         if description is not None and description.strip():
             ticket.description = description.strip()
@@ -245,11 +271,32 @@ def edit_ticket(
             if not db.get(models.Category, category_id):
                 return _back(number, "Категория не найдена")
             ticket.category_id = category_id
+        if priority:
+            if priority not in models.Priority.ALL:
+                return _back(number, "Неизвестный приоритет")
+            ticket.priority = priority
     else:
         raise HTTPException(403, "Исполнитель не редактирует заявку")
 
     db.commit()
     return _back(number)
+
+
+@router.post("/tickets/{number}/delete")
+def delete_ticket_web(
+    number: str,
+    user: Optional[models.User] = Depends(get_web_user),
+    db: Session = Depends(get_db),
+):
+    """Удаление заявки (только администратор, с подтверждением в интерфейсе)."""
+    if not user:
+        return RedirectResponse("/login", status_code=303)
+    if user.role != models.Role.ADMIN:
+        raise HTTPException(403, "Удалять заявки может только администратор")
+    ticket = get_ticket_or_404(number, db)
+    db.delete(ticket)
+    db.commit()
+    return RedirectResponse("/", status_code=303)
 
 
 # ---------- Действия со статусами и назначением ----------

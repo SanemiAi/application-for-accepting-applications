@@ -1,11 +1,14 @@
 {% extends "base.html" %}
 {% block title %}Новая заявка{% endblock %}
 {% block content %}
+{% if error %}
+<div class="alert">⚠ {{ error }}</div>
+{% endif %}
 <div class="card" style="max-width:640px">
   <h2>Новая заявка</h2>
   <form method="post" action="/tickets/new">
-    <label>Тема</label>
-    <input name="subject" required maxlength="200">
+    <label>Тема (минимум 3 символа)</label>
+    <input name="subject" required minlength="3" maxlength="200">
     <label>Описание</label>
     <textarea name="description" required></textarea>
     <label>Категория</label>
@@ -13,6 +16,12 @@
       <option value="">— без категории —</option>
       {% for c in categories %}
       <option value="{{ c.id }}">{{ c.name }}</option>
+      {% endfor %}
+    </select>
+    <label>Приоритет</label>
+    <select name="priority">
+      {% for code, label in priorities.items() %}
+      <option value="{{ code }}" {% if code == "medium" %}selected{% endif %}>{{ label }}</option>
       {% endfor %}
     </select>
     <button>Подать заявку</button>

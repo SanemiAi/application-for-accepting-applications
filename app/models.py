@@ -37,6 +37,20 @@ class Status:
     }
 
 
+class Priority:
+    LOW = "low"               # Низкий
+    MEDIUM = "medium"         # Средний
+    HIGH = "high"             # Высокий
+
+    LABELS = {
+        LOW: "Низкий",
+        MEDIUM: "Средний",
+        HIGH: "Высокий",
+    }
+
+    ALL = tuple(LABELS)
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -64,6 +78,7 @@ class Ticket(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     category_id = Column(Integer, ForeignKey("categories.id"))
     status = Column(String(20), nullable=False, default=Status.NEW)
+    priority = Column(String(20), nullable=False, default=Priority.MEDIUM)
     executor_id = Column(Integer, ForeignKey("users.id"))
     applicant_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
@@ -81,6 +96,10 @@ class Ticket(Base):
     @property
     def status_label(self):
         return Status.LABELS[self.status]
+
+    @property
+    def priority_label(self):
+        return Priority.LABELS[self.priority]
 
     @property
     def category_name(self):
