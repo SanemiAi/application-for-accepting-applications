@@ -5,7 +5,7 @@ from .. import models, schemas
 from ..auth import get_current_user
 from ..database import get_db
 
-router = APIRouter(prefix="/tickets", tags=["Заявки"])
+router = APIRouter(prefix="/requests", tags=["Заявки"])
 
 
 def get_ticket_or_404(number: str, db: Session) -> models.Ticket:
@@ -42,7 +42,7 @@ def apply_status(ticket: models.Ticket, new_status: str, by_role: str):
     ticket.status = new_status
 
 
-@router.get("", response_model=list[schemas.TicketOut])
+@router.get("", response_model=list[schemas.TicketOut], summary="Список заявок (фильтры: status, category_id, priority, q)")
 def list_tickets(
     status: str | None = Query(default=None, description="Код статуса: new/in_work/done/closed"),
     category_id: int | None = None,
@@ -72,7 +72,7 @@ def list_tickets(
     return q_.order_by(models.Ticket.created_at.desc()).all()
 
 
-@router.post("", response_model=schemas.TicketOut, status_code=201)
+@router.post("", response_model=schemas.TicketOut, status_code=201, summary="Создать заявку")
 def create_ticket(
     data: schemas.TicketCreate,
     user: models.User = Depends(get_current_user),
@@ -99,7 +99,7 @@ def create_ticket(
     return ticket
 
 
-@router.get("/{number}", response_model=schemas.TicketOut)
+@router.get("/{number}", response_model=schemas.TicketOut, summary="Получить заявку по номеру", responses={404: {"description": "Заявка не найдена"}})
 def get_ticket(
     number: str,
     user: models.User = Depends(get_current_user),
@@ -110,7 +110,7 @@ def get_ticket(
     return ticket
 
 
-@router.patch("/{number}", response_model=schemas.TicketOut)
+@router.patch("/{number}", response_model=schemas.TicketOut, summary="Изменить заявку (права зависят от роли)", responses={404: {"description": "Заявка не найдена"}, 422: {"description": "Ошибка валидации"}})
 def update_ticket(
     number: str,
     data: schemas.TicketPatch,
@@ -199,7 +199,7 @@ def _validate_executor(db: Session, executor_id: int) -> int:
     return executor_id
 
 
-@router.post("/{number}/take", response_model=schemas.TicketOut)
+@router.post("/{number}/take", response_model=schemas.TicketOut, summary="Взять заявку в работу (исполнитель)")
 def take_ticket(
     number: str,
     user: models.User = Depends(get_current_user),
@@ -218,7 +218,7 @@ def take_ticket(
     return ticket
 
 
-@router.post("/{number}/complete", response_model=schemas.TicketOut)
+@router.post("/{number}/complete", response_model=schemas.TicketOut, summary="Отметить заявку выполненной (исполнитель)")
 def complete_ticket(
     number: str,
     data: schemas.CommentCreate | None = None,
@@ -241,7 +241,7 @@ def complete_ticket(
     return ticket
 
 
-@router.post("/{number}/close", response_model=schemas.TicketOut)
+@router.post("/{number}/close", response_model=schemas.TicketOut, summary="Закрыть выполненную заявку")
 def close_ticket(
     number: str,
     user: models.User = Depends(get_current_user),
@@ -260,7 +260,7 @@ def close_ticket(
     return ticket
 
 
-@router.delete("/{number}", status_code=204)
+@router.delete("/{number}", status_code=204, summary="Удалить заявку (только администратор)", responses={403: {"description": "Недостаточно прав"}, 404: {"description": "Заявка не найдена"}})
 def delete_ticket(
     number: str,
     user: models.User = Depends(get_current_user),
@@ -274,7 +274,7 @@ def delete_ticket(
     db.commit()
 
 
-@router.post("/{number}/comments", response_model=schemas.CommentOut, status_code=201)
+@router.post("/{number}/comments", response_model=schemas.CommentOut, status_code=201, summary="Добавить комментарий к заявке")
 def add_comment(
     number: str,
     data: schemas.CommentCreate,

@@ -8,13 +8,24 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from .database import Base, engine, SessionLocal
 from . import models
 from .auth import hash_password
-from .routers import admin_router, auth_router, tickets_router, web_router
+from .routers import admin_router, auth_router, references_router, tickets_router, web_router
 
-app = FastAPI(title="Система приёма и подачи заявок", version="1.0.0")
+app = FastAPI(
+    title="Система приёма и подачи заявок",
+    version="1.1.0",
+    description=(
+        "REST API и веб-интерфейс системы учёта заявок. "
+        "Роли: Заявитель, Оператор, Исполнитель, Администратор. "
+        "Аутентификация — JWT (кнопка Authorize). Ошибки возвращаются "
+        "в едином формате `{\"detail\": \"...\"}`, ошибки валидации — HTTP 422 "
+        "с полем `errors`."
+    ),
+)
 
 # REST API — под префиксом /api, веб-интерфейс — в корне (во избежание конфликта маршрутов)
 app.include_router(auth_router.router, prefix="/api")
 app.include_router(tickets_router.router, prefix="/api")
+app.include_router(references_router.router, prefix="/api")
 app.include_router(admin_router.router, prefix="/api")
 app.include_router(web_router.router)  # веб-интерфейс (браузер)
 
