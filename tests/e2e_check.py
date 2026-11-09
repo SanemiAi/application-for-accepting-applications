@@ -29,7 +29,10 @@ def api(method, path, token=None, data=None, form=None):
         req.add_header("Content-Type", "application/x-www-form-urlencoded")
     try:
         with urllib.request.urlopen(req, body) as r:
-            return r.status, json.loads(r.read()) if r.headers.get("Content-Type", "").startswith("application/json") else r.read()
+            raw = r.read()
+            if r.headers.get("Content-Type", "").startswith("application/json") and raw:
+                return r.status, json.loads(raw)
+            return r.status, raw
     except urllib.error.HTTPError as e:
         raw = e.read()
         try:
@@ -90,13 +93,22 @@ for u, p, n, r in [("ivan", "ivan123", "Иван Петров", "applicant"),
 st, users = api("GET", "/admin/users", token=admin)
 uid = {u["username"]: u["id"] for u in users}
 
-print("== 3. Заявитель создаёт заявку (API) ==")
+print("== 3. Заявитель создаёт заявку (API, с приоритетом) ==")
 st, tk = api("POST", "/auth/login", form={"username": "ivan", "password": "ivan123"})
 ivan = tk["access_token"]
 st, t = api("POST", "/tickets", token=ivan,
-            data={"subject": "Не работает принтер", "description": "Принтер HP в бухгалтерии не печатает.", "category_id": cats[0]["id"]})
+            data={"subject": "Не работает принтер", "description": "Принтер HP в бухгалтерии не печатает.",
+                  "category_id": cats[0]["id"], "priority": "high"})
 check("Заявка создана, номер присвоен", st == 201 and t["number"].startswith("З-"), t)
+check("Приоритет сохранён", t.get("priority") == "high" and t.get("priority_label") == "Высокий", t.get("priority"))
 num = t["number"]
+
+st, res = api("POST", "/tickets", token=ivan,
+              data={"subject": "аб", "description": "короткая тема"})
+check("Валидация: короткая тема -> 422", st == 422, st)
+st, res = api("POST", "/tickets", token=ivan,
+              data={"subject": "Нормальная тема", "description": "описание", "priority": "super"})
+check("Валидация: неверный приоритет -> 422", st == 422, st)
 
 print("== 4. Веб: фильтры и поиск ==")
 adm_cookie = web_login("admin", "admin123")
@@ -107,6 +119,12 @@ st, _, html = web("GET", "/?status=closed", cookie=adm_cookie)
 check("Фильтр по статусу: closed пуст", st == 200 and num not in html)
 st, _, html = web("GET", "/?q=принтер", cookie=adm_cookie)
 check("Поиск по теме находит заявку", st == 200 and num in html)
+st, _, html = web("GET", "/?q=бухгалтерии", cookie=adm_cookie)
+check("Поиск по описанию находит заявку", st == 200 and num in html)
+st, _, html = web("GET", "/?priority=high&status=new", cookie=adm_cookie)
+check("Фильтр по приоритету работает", st == 200 and num in html)
+st, _, html = web("GET", "/?priority=low&status=new", cookie=adm_cookie)
+check("Фильтр по приоритету: low не содержит high-заявку", st == 200 and num not in html)
 st, _, html = web("GET", "/?q=несуществующийтекст", cookie=adm_cookie)
 check("Поиск: пустое состояние", st == 200 and "ничего не найдено" in html)
 
@@ -159,5 +177,26 @@ check("Исполнитель видит свою закрытую заявку"
 st, tk = api("POST", "/auth/login", form={"username": "ivan", "password": "ivan123"})
 st, res = api("GET", "/admin/users", token=tk["access_token"])
 check("Заявителю запрещён /admin -> 403", st == 403, st)
+
+print("== 10. Страницы ошибок и удаление ==")
+st, _, html = web("GET", "/tickets/З-999999", cookie=adm_cookie)
+check("Несуществующая заявка -> HTML 404", st == 404 and "не найдена" in html.lower(), st)
+st, res = api("DELETE", f"/tickets/{num}", token=tk["access_token"])
+check("Удаление заявителем -> 403", st == 403, st)
+st, res = api("DELETE", f"/tickets/{num}", token=admin)
+check("Удаление администратором -> 204", st == 204, st)
+st, res = api("GET", f"/tickets/{num}", token=admin)
+check("Удалённая заявка не находится -> 404", st == 404, st)
+st, res = api("DELETE", f"/tickets/{num}", token=admin)
+check("Повторное удаление -> 404", st == 404, st)
+
+print("== 11. Тестовые данные (ЛР6): >=10 заявок, >=4 пользователей ==")
+st, lst = api("GET", "/tickets", token=admin)
+check(f"Заявок >= 10 (сейчас {len(lst)})", len(lst) >= 10, len(lst))
+st, users = api("GET", "/admin/users", token=admin)
+check(f"Пользователей >= 4 (сейчас {len(users)})", len(users) >= 4, len(users))
+check("Категорий >= 4", len(cats) >= 4, len(cats))
+statuses = {t["status"] for t in lst}
+check(f"Несколько статусов в данных ({sorted(statuses)})", len(statuses) >= 3, statuses)
 
 print(f"\nИТОГ: {ok} passed, {fail} failed")
