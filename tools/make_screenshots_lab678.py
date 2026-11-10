@@ -11,19 +11,25 @@ import json
 import re
 import socket
 import subprocess
+import sys
 import urllib.request
 from pathlib import Path
 
 from playwright.sync_api import sync_playwright
 
-BASE = "http://localhost:8000"
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+
+from tools.credentials import required  # noqa: E402
+
+BASE = "http://localhost:8000"
 OUT6 = ROOT / "docs" / "screenshots_lab6"
 OUT7 = ROOT / "docs" / "screenshots_lab7"
 OUT8 = ROOT / "docs" / "screenshots_lab8"
 DOCKER = r"C:\Program Files\Docker\Docker\resources\bin\docker.exe"
 
-ADMIN = ("admin", "admin123")
+# Пароль берётся из окружения/.env, в репозитории не хранится
+ADMIN = ("admin", required("ADMIN_PASSWORD"))
 
 
 def lan_ip() -> str:

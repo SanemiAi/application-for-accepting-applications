@@ -14,11 +14,16 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
+import secrets  # noqa: E402
+
 TEST_DB = Path(__file__).parent / "test_tickets.db"
 os.environ["DATABASE_URL"] = f"sqlite:///{TEST_DB.as_posix()}"
 os.environ["JWT_SECRET"] = "test-secret"
 os.environ["ADMIN_USERNAME"] = "admin"
-os.environ["ADMIN_PASSWORD"] = "admin123"
+# Одноразовый случайный пароль на запуск — в репозитории паролей нет
+os.environ["ADMIN_PASSWORD"] = secrets.token_hex(8)
+ADMIN_PASSWORD = os.environ["ADMIN_PASSWORD"]
+TEST_USER_PASSWORD = secrets.token_hex(8)
 
 from fastapi.testclient import TestClient  # noqa: E402
 
@@ -42,22 +47,22 @@ def _token(client, username, password):
 
 @pytest.fixture(scope="session")
 def admin_h(client):
-    return _token(client, "admin", "admin123")
+    return _token(client, "admin", ADMIN_PASSWORD)
 
 
 @pytest.fixture(scope="session")
 def users(client, admin_h):
     """Пользователи всех ролей для тестов."""
     created = {}
-    for username, password, full_name, role in [
-        ("t_applicant", "pass12345", "Тест Заявитель", "applicant"),
-        ("t_operator", "pass12345", "Тест Оператор", "operator"),
-        ("t_executor", "pass12345", "Тест Исполнитель", "executor"),
+    for username, full_name, role in [
+        ("t_applicant", "Тест Заявитель", "applicant"),
+        ("t_operator", "Тест Оператор", "operator"),
+        ("t_executor", "Тест Исполнитель", "executor"),
     ]:
         client.post("/api/admin/users", headers=admin_h,
-                    json={"username": username, "password": password,
+                    json={"username": username, "password": TEST_USER_PASSWORD,
                           "full_name": full_name, "role": role})
-        created[role] = _token(client, username, password)
+        created[role] = _token(client, username, TEST_USER_PASSWORD)
     return created
 
 

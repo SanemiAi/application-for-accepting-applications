@@ -4,11 +4,15 @@
 в docs/postman_collection.json. Приложение должно быть запущено."""
 import json
 import os
+import sys
 import urllib.request
 import urllib.parse
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT)
 BASE = "http://localhost:8000/api"
+
+from tools.credentials import required  # noqa: E402
 
 
 def call(method, path, token=None, data=None, form=None):
@@ -65,12 +69,13 @@ def main():
         out.append("")
         checks.append(st)
 
-    # Авторизация
-    st, res = call("POST", "/auth/login", form={"username": "admin", "password": "admin123"})
+    # Авторизация (пароль не публикуем — берём из окружения/.env, в отчёт пишем ***)
+    admin_password = required("ADMIN_PASSWORD")
+    st, res = call("POST", "/auth/login", form={"username": "admin", "password": admin_password})
     token = res["access_token"]
     out += ["### 1. Авторизация (получение JWT)",
             curl("POST", "/auth/login", token=False,
-                 form={"username": "admin", "password": "admin123"}),
+                 form={"username": "admin", "password": "***"}),
             f"-> HTTP {st}, получен access_token", ""]
 
     step("2. GET /requests — список заявок", "GET", "/requests", token=token, expect=200)

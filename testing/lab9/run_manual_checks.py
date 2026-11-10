@@ -7,13 +7,21 @@
 Запуск: python testing/lab9/run_manual_checks.py
 """
 import json
+import sys
 import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from tools.credentials import required  # noqa: E402
+
 BASE = "http://localhost:8000"
+# Учётные данные берутся из окружения/.env, в репозитории не хранятся
+ADMIN_PASSWORD = required("ADMIN_PASSWORD")
+DEMO_PASSWORD = required("SEED_DEMO_PASSWORD")
 OUT = Path(__file__).parent / "evidence" / "manual_checks.txt"
 LOG = []
 RESULTS = {}
@@ -92,16 +100,16 @@ def case(cid, name, ok, evidence):
 def main():
     log(f"Выполнение тест-кейсов ЛР №9 — {datetime.now():%d.%m.%Y %H:%M}")
     log(f"Стенд: {BASE} (версия 1.1.0, коммит 805ae00+)")
-    st, _ = api("GET", "/requests", token=token_of("admin", "admin123"))
+    st, _ = api("GET", "/requests", token=token_of("admin", ADMIN_PASSWORD))
     log(f"Предусловие: /api/requests доступен -> HTTP {st}")
     log("")
 
-    admin = token_of("admin", "admin123")
-    ivan = token_of("ivan", "ivan123")
-    olga = token_of("olga", "olga123")
-    igor = token_of("igor", "igor123")
-    adm_c = web_login("admin", "admin123")
-    ivan_c = web_login("ivan", "ivan123")
+    admin = token_of("admin", ADMIN_PASSWORD)
+    ivan = token_of("ivan", DEMO_PASSWORD)
+    olga = token_of("olga", DEMO_PASSWORD)
+    igor = token_of("igor", DEMO_PASSWORD)
+    adm_c = web_login("admin", ADMIN_PASSWORD)
+    ivan_c = web_login("ivan", DEMO_PASSWORD)
 
     # ---------- Позитивные функциональные ----------
     st, t = api("POST", "/requests", token=ivan,

@@ -12,7 +12,8 @@ cp .env.example .env   # настройки (порты, пароли, JWT-се�
 docker compose up --build
 ```
 
-- Веб-интерфейс: http://localhost:8000 (вход — стартовый админ `admin` / `admin123`)
+- Веб-интерфейс: http://localhost:8000 (логин стартового админа — `ADMIN_USERNAME` из `.env`,
+  пароль — `ADMIN_PASSWORD`; в репозитории пароли не публикуются)
 - Swagger UI (REST API): http://localhost:8000/docs
 - Проверка работоспособности: http://localhost:8000/health → `{"status": "ok"}`
 - Все настройки — через `.env` (шаблон `.env.example`): `APP_PORT`, параметры БД,
@@ -120,7 +121,7 @@ docker compose up --build
 # 1. Логин — получить токен
 TOKEN=$(curl -s -X POST http://localhost:8000/api/auth/login \
   -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "username=admin&password=admin123" | python -c "import sys,json;print(json.load(sys.stdin)['access_token'])")
+  -d "username=admin&password=$ADMIN_PASSWORD" | python -c "import sys,json;print(json.load(sys.stdin)['access_token'])")
 
 # 2. Список заявок с фильтром по статусу
 curl -s "http://localhost:8000/api/requests?status=new" -H "Authorization: Bearer $TOKEN"
@@ -184,7 +185,9 @@ docker compose exec app python tools/seed_demo.py
 
 Скрипт идемпотентен — повторный запуск не создаёт дубликатов.
 Тестовые пользователи: `olga` (оператор), `igor`/`petr` (исполнители),
-`ivan`/`maria` (заявители) — пароль у всех `<логин>123`.
+`ivan`/`maria` (заявители). Пароль у всех единый и задаётся переменной
+`SEED_DEMO_PASSWORD` в `.env`; если переменная не задана, скрипт генерирует
+случайный пароль и печатает его в консоль. Пароли в репозитории не хранятся.
 
 ## Пример сценария
 

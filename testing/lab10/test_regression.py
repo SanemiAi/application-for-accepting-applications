@@ -1,7 +1,10 @@
 """Регрессионные тесты на дефекты BUG-01..BUG-03 из testing/lab9/bug_reports.md."""
+import os
 
 
-def _login_web(client, username="admin", password="admin123"):
+def _login_web(client, username="admin", password=None):
+    if password is None:
+        password = os.environ["ADMIN_PASSWORD"]  # задаётся в conftest.py
     r = client.post("/login", data={"username": username, "password": password},
                     follow_redirects=False)
     assert r.status_code == 303
