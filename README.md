@@ -8,14 +8,25 @@ REST API + веб-интерфейс на **FastAPI + PostgreSQL** с ролев
 ## Запуск
 
 ```bash
+cp .env.example .env   # настройки (порты, пароли, JWT-секрет) — по желанию
 docker compose up --build
 ```
 
 - Веб-интерфейс: http://localhost:8000 (вход — стартовый админ `admin` / `admin123`)
 - Swagger UI (REST API): http://localhost:8000/docs
-- Стартовый админ переопределяется через `ADMIN_USERNAME` / `ADMIN_PASSWORD`
+- Проверка работоспособности: http://localhost:8000/health → `{"status": "ok"}`
+- Все настройки — через `.env` (шаблон `.env.example`): `APP_PORT`, параметры БД,
+  `JWT_SECRET`, стартовый админ (`ADMIN_USERNAME` / `ADMIN_PASSWORD`)
 
 Остановка: `docker compose down` (данные сохранятся); `docker compose down -v` — удалит и базу.
+
+## Деплой
+
+Приложение развёрнуто на собственной машине и доступно в локальной сети по адресу
+**http://192.168.1.101:8000** (дата деплоя: 10.11.2026).
+
+Полная инструкция повторного деплоя с нуля (clone → `.env` → `docker compose up --build`
+→ проверка `/health` → открытие порта в брандмауэре) — в [docs/deploy.md](docs/deploy.md).
 
 ## Роли и права
 
