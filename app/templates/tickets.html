@@ -10,7 +10,7 @@
 
 <div class="card">
   <form method="get" action="/" class="filters">
-    <input type="text" name="q" value="{{ f_q }}" placeholder="Поиск по номеру, теме или описанию...">
+    <input type="text" name="q" value="{{ f_q }}" placeholder="Номер, тема, описание, категория, исполнитель...">
     <select name="status">
       <option value="">Все статусы</option>
       {% for code, label in labels.items() %}

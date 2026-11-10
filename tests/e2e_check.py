@@ -129,6 +129,12 @@ st, _, html = web("GET", "/?q=несуществующийтекст", cookie=ad
 check("Поиск: пустое состояние", st == 200 and "ничего не найдено" in html)
 st, _, html = web("GET", "/?q=принтер&status=&category_id=&priority=", cookie=adm_cookie)
 check("Поиск с пустыми фильтрами (форма браузера) -> 200", st == 200 and num in html, st)
+st, _, html = web("GET", "/?q=Снабжение", cookie=adm_cookie)
+check("Поиск по названию категории находит заявки", st == 200 and "З-0000" in html, st)
+st, res = api("GET", "/requests?q=Снабжение", token=admin)
+check("API: поиск по названию категории", st == 200 and isinstance(res, list) and len(res) >= 1, st)
+st, res = api("GET", "/requests?q=Мастеров", token=admin)
+check("API: поиск по ФИО исполнителя", st == 200 and isinstance(res, list) and len(res) >= 1, st)
 
 print("== 5. Оператор назначает исполнителя (веб) ==")
 olga_cookie = web_login("olga", "olga123")

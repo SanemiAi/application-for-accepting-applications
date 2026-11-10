@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
 from .. import models, schemas
 from ..auth import get_current_user
@@ -47,7 +47,7 @@ def list_tickets(
     status: str | None = Query(default=None, description="Код статуса: new/in_work/done/closed"),
     category_id: int | None = None,
     priority: str | None = Query(default=None, description="Код приоритета: low/medium/high"),
-    q: str | None = Query(default=None, description="Поиск по номеру, теме и описанию"),
+    q: str | None = Query(default=None, description="Поиск по номеру, теме, описанию, категории, исполнителю и заявителю"),
     user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -64,10 +64,20 @@ def list_tickets(
         q_ = q_.filter(models.Ticket.priority == priority)
     if q:
         like = f"%{q.strip()}%"
-        q_ = q_.filter(
-            models.Ticket.subject.ilike(like)
-            | models.Ticket.number.ilike(like)
-            | models.Ticket.description.ilike(like)
+        executor_u = aliased(models.User)
+        applicant_u = aliased(models.User)
+        q_ = (
+            q_.outerjoin(models.Category, models.Ticket.category_id == models.Category.id)
+            .outerjoin(executor_u, models.Ticket.executor_id == executor_u.id)
+            .outerjoin(applicant_u, models.Ticket.applicant_id == applicant_u.id)
+            .filter(
+                models.Ticket.subject.ilike(like)
+                | models.Ticket.number.ilike(like)
+                | models.Ticket.description.ilike(like)
+                | models.Category.name.ilike(like)
+                | executor_u.full_name.ilike(like)
+                | applicant_u.full_name.ilike(like)
+            )
         )
     return q_.order_by(models.Ticket.created_at.desc()).all()
 

@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from jose import jwt, JWTError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
 from .. import models
 from ..auth import SECRET_KEY, ALGORITHM, create_access_token, verify_password
@@ -118,10 +118,20 @@ def index(
         query = query.filter(models.Ticket.priority == priority)
     if q:
         like = f"%{q.strip()}%"
-        query = query.filter(
-            models.Ticket.subject.ilike(like)
-            | models.Ticket.number.ilike(like)
-            | models.Ticket.description.ilike(like)
+        executor_u = aliased(models.User)
+        applicant_u = aliased(models.User)
+        query = (
+            query.outerjoin(models.Category, models.Ticket.category_id == models.Category.id)
+            .outerjoin(executor_u, models.Ticket.executor_id == executor_u.id)
+            .outerjoin(applicant_u, models.Ticket.applicant_id == applicant_u.id)
+            .filter(
+                models.Ticket.subject.ilike(like)
+                | models.Ticket.number.ilike(like)
+                | models.Ticket.description.ilike(like)
+                | models.Category.name.ilike(like)
+                | executor_u.full_name.ilike(like)
+                | applicant_u.full_name.ilike(like)
+            )
         )
     tickets = query.order_by(models.Ticket.created_at.desc()).all()
     categories = db.query(models.Category).order_by(models.Category.name).all()
