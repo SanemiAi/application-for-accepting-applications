@@ -17,7 +17,7 @@
 | Браузер/инструменты | Chromium (Playwright), curl 8.x, Swagger UI `/docs`, Python 3.15 |
 | Запуск | `docker compose up --build -d` (контейнеры `ticket_system-app-1`, `ticket_system-db-1`) |
 | Тестовые данные | `docker compose exec app python tools/seed_demo.py` — 6 пользователей, 5 категорий, 12 заявок |
-| Тестовые учётные записи | `admin` (администратор), `olga` (оператор), `igor`/`petr` (исполнители), `ivan`/`maria` (заявители) |
+| Тестовые учётные записи | `admin` (администратор), `olga` (оператор), `igor`/`petr` (исполнители), `ivan`/`maria` (заявители). Пароли в репозитории не публикуются — задаются локально через `.env` (`ADMIN_PASSWORD`, `SEED_DEMO_PASSWORD`) |
 
 ## Что проверяется
 

@@ -1,8 +1,17 @@
 import json
+import os
+import sys
 import urllib.request
 import urllib.parse
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from tools.credentials import required  # noqa: E402
+
 BASE = "http://localhost:8000"
+# Учётные данные берутся из окружения/.env, в репозитории не хранятся
+ADMIN_PASSWORD = required("ADMIN_PASSWORD")
+DEMO_PASSWORD = required("SEED_DEMO_PASSWORD")
 ok, fail = 0, 0
 
 
@@ -74,7 +83,7 @@ def web_login(username, password):
 
 
 print("== 1. Категории (нужно >= 4) ==")
-st, tk = api("POST", "/auth/login", form={"username": "admin", "password": "admin123"})
+st, tk = api("POST", "/auth/login", form={"username": "admin", "password": ADMIN_PASSWORD})
 admin = tk["access_token"]
 st, users = api("GET", "/admin/users", token=admin)
 check("Админ авторизован, список пользователей", st == 200)
@@ -82,9 +91,9 @@ st, cats = api("GET", "/admin/categories", token=admin)
 check(f"Категорий >= 4 (сейчас {len(cats) if isinstance(cats, list) else '?'})", isinstance(cats, list) and len(cats) >= 4, cats)
 
 print("== 2. Создание пользователей ролей ==")
-for u, p, n, r in [("ivan", "ivan123", "Иван Петров", "applicant"),
-                   ("olga", "olga123", "Ольга Сидорова", "operator"),
-                   ("igor", "igor123", "Игорь Мастеров", "executor")]:
+for u, p, n, r in [("ivan", DEMO_PASSWORD, "Иван Петров", "applicant"),
+                   ("olga", DEMO_PASSWORD, "Ольга Сидорова", "operator"),
+                   ("igor", DEMO_PASSWORD, "Игорь Мастеров", "executor")]:
     st, res = api("POST", "/admin/users", token=admin,
                   data={"username": u, "password": p, "full_name": n, "role": r})
     exists = st == 400 and "существует" in str(res)
@@ -94,7 +103,7 @@ st, users = api("GET", "/admin/users", token=admin)
 uid = {u["username"]: u["id"] for u in users}
 
 print("== 3. Заявитель создаёт заявку (API, с приоритетом) ==")
-st, tk = api("POST", "/auth/login", form={"username": "ivan", "password": "ivan123"})
+st, tk = api("POST", "/auth/login", form={"username": "ivan", "password": DEMO_PASSWORD})
 ivan = tk["access_token"]
 st, t = api("POST", "/requests", token=ivan,
             data={"subject": "Не работает принтер", "description": "Принтер HP в бухгалтерии не печатает.",
@@ -111,7 +120,7 @@ st, res = api("POST", "/requests", token=ivan,
 check("Валидация: неверный приоритет -> 422", st == 422, st)
 
 print("== 4. Веб: фильтры и поиск ==")
-adm_cookie = web_login("admin", "admin123")
+adm_cookie = web_login("admin", ADMIN_PASSWORD)
 check("Веб-логин админа", adm_cookie is not None)
 st, _, html = web("GET", "/?status=new", cookie=adm_cookie)
 check("Фильтр по статусу: заявка видна", st == 200 and num in html)
@@ -137,7 +146,7 @@ st, res = api("GET", "/requests?q=Мастеров", token=admin)
 check("API: поиск по ФИО исполнителя", st == 200 and isinstance(res, list) and len(res) >= 1, st)
 
 print("== 5. Оператор назначает исполнителя (веб) ==")
-olga_cookie = web_login("olga", "olga123")
+olga_cookie = web_login("olga", DEMO_PASSWORD)
 check("Веб-логин оператора", olga_cookie is not None)
 st, h, _ = web("POST", f"/tickets/{num}/assign", cookie=olga_cookie, form={"executor_id": str(uid["igor"])})
 check("Назначение исполнителя -> 303", st == 303, (st, h))
@@ -153,7 +162,7 @@ st, t = api("GET", f"/requests/{num}", token=admin)
 check("Тема уточнена оператором", t["subject"] == "Не работает принтер HP LaserJet", t["subject"])
 
 print("== 7. Исполнитель берёт в работу и выполняет (веб) ==")
-igor_cookie = web_login("igor", "igor123")
+igor_cookie = web_login("igor", DEMO_PASSWORD)
 check("Веб-логин исполнителя", igor_cookie is not None)
 st, _, html = web("GET", "/", cookie=igor_cookie)
 check("Исполнитель видит назначенную заявку", num in html)
@@ -165,7 +174,7 @@ st, t = api("GET", f"/requests/{num}", token=admin)
 check("Статус 'Выполнена'", t["status"] == "done", t["status"])
 
 print("== 8. Заявитель дополняет описание и закрывает (веб) ==")
-ivan_cookie = web_login("ivan", "ivan123")
+ivan_cookie = web_login("ivan", DEMO_PASSWORD)
 st, _, _ = web("POST", f"/tickets/{num}/edit", cookie=ivan_cookie, form={"description": "Проверил печать — всё работает, спасибо!"})
 st, t = api("GET", f"/requests/{num}", token=admin)
 check("Описание дополнено заявителем", "[Дополнено заявителем]" in t["description"])
@@ -182,7 +191,7 @@ st, res = api("GET", f"/requests/{num}", token=None)
 check("Без токена API -> 401", st == 401, st)
 st, h, html = web("GET", f"/tickets/{num}", cookie=igor_cookie)
 check("Исполнитель видит свою закрытую заявку", st == 200 and num in html)
-st, tk = api("POST", "/auth/login", form={"username": "ivan", "password": "ivan123"})
+st, tk = api("POST", "/auth/login", form={"username": "ivan", "password": DEMO_PASSWORD})
 st, res = api("GET", "/admin/users", token=tk["access_token"])
 check("Заявителю запрещён /admin -> 403", st == 403, st)
 

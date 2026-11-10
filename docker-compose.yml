@@ -5,7 +5,7 @@ services:
     image: postgres:16
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
       POSTGRES_DB: ${POSTGRES_DB:-tickets}
     ports:
       - "${DB_PORT:-5432}:5432"
@@ -23,10 +23,11 @@ services:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg2://postgres:postgres@db:5432/tickets}
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg2://postgres:change-me@db:5432/tickets}
       JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-change-me}
+      SEED_DEMO_PASSWORD: ${SEED_DEMO_PASSWORD:-}
     ports:
       - "${APP_PORT:-8000}:8000"
 

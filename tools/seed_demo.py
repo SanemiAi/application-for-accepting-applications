@@ -7,21 +7,26 @@
 Идемпотентно: повторный запуск не создаёт дубликатов.
 """
 import os
+import secrets
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from tools.credentials import required      # noqa: E402
 from app.auth import hash_password          # noqa: E402
 from app.database import Base, SessionLocal, engine  # noqa: E402
 from app import models                      # noqa: E402
 
+# Пароли не хранятся в репозитории: admin — из ADMIN_PASSWORD,
+# демо-пользователи — единый пароль из SEED_DEMO_PASSWORD
+# (если не задан, генерируется случайный и печатается в консоль).
 USERS = [
-    ("admin", "admin123", "Администратор системы", models.Role.ADMIN),
-    ("olga", "olga123", "Ольга Сидорова", models.Role.OPERATOR),
-    ("igor", "igor123", "Игорь Мастеров", models.Role.EXECUTOR),
-    ("petr", "petr123", "Пётр Ремонтников", models.Role.EXECUTOR),
-    ("ivan", "ivan123", "Иван Петров", models.Role.APPLICANT),
-    ("maria", "maria123", "Мария Кузнецова", models.Role.APPLICANT),
+    ("admin", "Администратор системы", models.Role.ADMIN),
+    ("olga", "Ольга Сидорова", models.Role.OPERATOR),
+    ("igor", "Игорь Мастеров", models.Role.EXECUTOR),
+    ("petr", "Пётр Ремонтников", models.Role.EXECUTOR),
+    ("ivan", "Иван Петров", models.Role.APPLICANT),
+    ("maria", "Мария Кузнецова", models.Role.APPLICANT),
 ]
 
 CATEGORIES = [
@@ -73,16 +78,24 @@ TICKETS = [
 
 def main():
     Base.metadata.create_all(bind=engine)
+    demo_password = os.environ.get("SEED_DEMO_PASSWORD")
+    if not demo_password:
+        demo_password = secrets.token_urlsafe(9)
+        print(f"SEED_DEMO_PASSWORD не задан, сгенерирован пароль демо-пользователей: {demo_password}")
+    admin_password = required("ADMIN_PASSWORD")
     db = SessionLocal()
     try:
         users = {}
-        for username, password, full_name, role in USERS:
+        for username, full_name, role in USERS:
+            password = admin_password if role == models.Role.ADMIN else demo_password
             u = db.query(models.User).filter_by(username=username).first()
             if not u:
                 u = models.User(username=username, password_hash=hash_password(password),
                                 full_name=full_name, role=role)
                 db.add(u)
                 db.flush()
+            else:
+                u.password_hash = hash_password(password)
             users[username] = u
 
         cats = {}

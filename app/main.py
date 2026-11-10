@@ -78,7 +78,7 @@ def startup():
         if not db.query(models.User).filter_by(role=models.Role.ADMIN).first():
             admin = models.User(
                 username=os.getenv("ADMIN_USERNAME", "admin"),
-                password_hash=hash_password(os.getenv("ADMIN_PASSWORD", "admin123")),
+                password_hash=hash_password(os.getenv("ADMIN_PASSWORD", "change-me")),
                 full_name="Администратор",
                 role=models.Role.ADMIN,
             )

@@ -2,12 +2,20 @@
 
 Запуск: python testing/lab9/make_evidence_shots.py
 """
+import sys
 from pathlib import Path
 
 from playwright.sync_api import sync_playwright
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from tools.credentials import required  # noqa: E402
+
 BASE = "http://localhost:8000"
 OUT = Path(__file__).parent / "evidence"
+# Учётные данные берутся из окружения/.env, в репозитории не хранятся
+ADMIN_PASSWORD = required("ADMIN_PASSWORD")
+DEMO_PASSWORD = required("SEED_DEMO_PASSWORD")
 
 
 def shot(page, name, full=False):
@@ -29,7 +37,7 @@ def main():
         browser = p.chromium.launch()
         page = browser.new_context(viewport={"width": 1440, "height": 900}).new_page()
 
-        login(page, "admin", "admin123")
+        login(page, "admin", ADMIN_PASSWORD)
         page.goto(BASE + "/")
         page.wait_for_selector("table")
         shot(page, "tc02_list.png")
@@ -56,7 +64,7 @@ def main():
         shot(page, "tc18_empty_search.png")
 
         page.goto(f"{BASE}/logout")
-        login(page, "ivan", "ivan123")
+        login(page, "ivan", DEMO_PASSWORD)
         page.wait_for_selector("table")
         shot(page, "tc19_applicant_own_list.png")
 
