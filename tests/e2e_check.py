@@ -127,6 +127,8 @@ st, _, html = web("GET", "/?priority=low&status=new", cookie=adm_cookie)
 check("Фильтр по приоритету: low не содержит high-заявку", st == 200 and num not in html)
 st, _, html = web("GET", "/?q=несуществующийтекст", cookie=adm_cookie)
 check("Поиск: пустое состояние", st == 200 and "ничего не найдено" in html)
+st, _, html = web("GET", "/?q=принтер&status=&category_id=&priority=", cookie=adm_cookie)
+check("Поиск с пустыми фильтрами (форма браузера) -> 200", st == 200 and num in html, st)
 
 print("== 5. Оператор назначает исполнителя (веб) ==")
 olga_cookie = web_login("olga", "olga123")
