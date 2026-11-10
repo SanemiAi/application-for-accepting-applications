@@ -159,9 +159,19 @@ tools/          make_diagrams.py, build_sqlite.py, seed_demo.py, api_checks.py
 При запущенном приложении (`docker compose up -d`):
 
 ```bash
-python tests/e2e_check.py   # 41 автоматическая проверка по всем ролям и сценариям
+python tests/e2e_check.py   # 45 сквозных проверок по всем ролям и сценариям
 python tools/build_sqlite.py  # пересоздать SQLite-базу и docs/sql_results.txt
 ```
+
+Автоматические тесты (pytest, отдельная тестовая БД, Docker не нужен):
+
+```bash
+pip install pytest httpx fastapi "sqlalchemy>=2.0" "pydantic>=2.6" \
+    "python-jose[cryptography]" "passlib[bcrypt]" "bcrypt==4.0.1" python-multipart jinja2
+python -m pytest testing/lab10 -v   # 23 теста: бизнес-логика, API, валидация, регрессия
+```
+
+Подробности — в `testing/lab10/README.md`; ручное тестирование — в `testing/lab9/`.
 
 ### Демонстрационные данные
 
