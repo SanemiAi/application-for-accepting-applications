@@ -24,3 +24,6 @@ Thumbs.db
 
 # Логи
 *.log
+
+# Тестовая БД автотестов (ЛР10)
+testing/lab10/test_tickets.db
