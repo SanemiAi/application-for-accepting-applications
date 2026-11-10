@@ -8,14 +8,25 @@ REST API + веб-интерфейс на **FastAPI + PostgreSQL** с ролев
 ## Запуск
 
 ```bash
+cp .env.example .env   # настройки (порты, пароли, JWT-секрет) — по желанию
 docker compose up --build
 ```
 
 - Веб-интерфейс: http://localhost:8000 (вход — стартовый админ `admin` / `admin123`)
 - Swagger UI (REST API): http://localhost:8000/docs
-- Стартовый админ переопределяется через `ADMIN_USERNAME` / `ADMIN_PASSWORD`
+- Проверка работоспособности: http://localhost:8000/health → `{"status": "ok"}`
+- Все настройки — через `.env` (шаблон `.env.example`): `APP_PORT`, параметры БД,
+  `JWT_SECRET`, стартовый админ (`ADMIN_USERNAME` / `ADMIN_PASSWORD`)
 
 Остановка: `docker compose down` (данные сохранятся); `docker compose down -v` — удалит и базу.
+
+## Деплой
+
+Приложение развёрнуто на собственной машине и доступно в локальной сети по адресу
+**http://192.168.1.101:8000** (дата деплоя: 10.11.2026).
+
+Полная инструкция повторного деплоя с нуля (clone → `.env` → `docker compose up --build`
+→ проверка `/health` → открытие порта в брандмауэре) — в [docs/deploy.md](docs/deploy.md).
 
 ## Роли и права
 
@@ -35,6 +46,16 @@ docker compose up --build
 
 `Новая → В работе → Выполнена → Закрыта` — другие переходы запрещены, система возвращает ошибку.
 
+## Приоритет
+
+У заявки есть приоритет: **Низкий / Средний / Высокий** (по умолчанию — Средний).
+Задаётся при создании, меняется оператором/администратором, участвует в фильтрации списка.
+
+## Удаление заявки
+
+Только администратор: кнопка в карточке заявки (с диалогом подтверждения) или
+`DELETE /api/requests/{number}` → HTTP 204. Комментарии удаляются каскадно.
+
 ## Веб-интерфейс
 
 - **/** — список заявок (фильтруется по роли) с **поиском по номеру/теме и фильтрами по статусу и категории**;
@@ -52,18 +73,71 @@ docker compose up --build
 - `POST /api/auth/login` — логин, выдаёт токен (в Swagger нажмите «Authorize»)
 
 **Заявки**
-- `POST /api/tickets` — создать заявку (тема, описание, категория)
-- `GET /api/tickets` — список (по роли; фильтры `status`, `category_id`)
-- `GET /api/tickets/{number}` — карточка заявки
-- `PATCH /api/tickets/{number}` — изменения в зависимости от роли (+ поле `comment`)
-- `POST /api/tickets/{number}/take` — взять в работу (исполнитель)
-- `POST /api/tickets/{number}/complete` — отметить выполнение (исполнитель)
-- `POST /api/tickets/{number}/close` — закрыть
-- `POST /api/tickets/{number}/comments` — добавить комментарий
+| Метод | Эндпоинт | Описание | Коды |
+|---|---|---|---|
+| `POST` | `/api/requests` | Создать заявку (тема ≥3 символов, описание, категория, приоритет) | 201 / 401 / 404 / 422 |
+| `GET` | `/api/requests` | Список по роли; query-фильтры: `q` (номер/тема/описание), `status`, `category_id`, `priority` | 200 / 401 |
+| `GET` | `/api/requests/{number}` | Карточка заявки | 200 / 401 / 403 / 404 |
+| `PATCH` | `/api/requests/{number}` | Изменения по роли (+ поле `comment`) | 200 / 400 / 401 / 403 / 404 / 422 |
+| `DELETE` | `/api/requests/{number}` | Удалить заявку (только admin) | 204 / 401 / 403 / 404 |
+| `POST` | `/api/requests/{number}/take` | Взять в работу (исполнитель) | 200 / 400 / 401 / 403 / 404 |
+| `POST` | `/api/requests/{number}/complete` | Отметить выполнение (исполнитель, + опц. комментарий) | 200 / 400 / 401 / 403 / 404 |
+| `POST` | `/api/requests/{number}/close` | Закрыть заявку | 200 / 400 / 401 / 403 / 404 |
+| `POST` | `/api/requests/{number}/comments` | Добавить комментарий | 201 / 401 / 403 / 404 / 422 |
+
+**Справочники**
+| Метод | Эндпоинт | Описание | Коды |
+|---|---|---|---|
+| `GET` | `/api/statuses` | Статусы заявок: коды, названия, допустимые переходы | 200 / 401 |
+| `GET` | `/api/priorities` | Приоритеты: коды и названия | 200 / 401 |
+| `GET` | `/api/categories` | Список категорий | 200 / 401 |
+| `GET` | `/api/users` | Список пользователей (только admin) | 200 / 401 / 403 |
 
 **Администрирование** (только admin)
 - `GET/POST /api/admin/users`, `PATCH /api/admin/users/{id}` (смена роли, сброс пароля)
 - `GET/POST/PATCH/DELETE /api/admin/categories`
+
+**Прочее**
+- `GET /health` — проверка работоспособности (без авторизации): `{"status": "ok"}`
+
+### Формат ошибок
+
+Все ошибки API возвращаются в едином формате JSON:
+
+```json
+{ "detail": "Текст ошибки" }
+```
+
+Для ошибок валидации (422) добавляется список полей:
+
+```json
+{ "detail": "Ошибка валидации данных", "errors": [ { "loc": [...], "msg": "...", "type": "..." } ] }
+```
+
+### Пример запроса (curl)
+
+```bash
+# 1. Логин — получить токен
+TOKEN=$(curl -s -X POST http://localhost:8000/api/auth/login \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "username=admin&password=admin123" | python -c "import sys,json;print(json.load(sys.stdin)['access_token'])")
+
+# 2. Список заявок с фильтром по статусу
+curl -s "http://localhost:8000/api/requests?status=new" -H "Authorization: Bearer $TOKEN"
+
+# 3. Создание заявки → HTTP 201
+curl -s -o /dev/null -w "%{http_code}\n" -X POST http://localhost:8000/api/requests \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"subject": "Тестовая заявка", "description": "Проверка API", "category_id": 1}'
+```
+
+### Проверка контракта
+
+- `docs/api_checks.txt` — 14 сохранённых curl-проверок (команда → HTTP-код → ответ),
+  генерируется скриптом `python tools/api_checks.py`;
+- `docs/postman_collection.json` — коллекция Postman (импорт: File → Import),
+  переменные `{{base_url}}` и `{{token}}`;
+- полное OpenAPI-описание с примерами — в Swagger UI `/docs`.
 
 ## Поля заявки
 
@@ -76,8 +150,8 @@ app/            исходный код (роутеры, модели, шабл�
 docs/           TZ.md, use_case.png, er.png, architecture/, ai_log.md, sql_results.txt
 sql/            schema.sql, seed.sql, queries.sql (лаба №5)
 database/       tickets.db — SQLite-база (лаба №5)
-tests/          e2e_check.py — сквозная проверка ролей и статусов (26 проверок)
-tools/          make_diagrams.py, build_sqlite.py — генерация артефактов
+tests/          e2e_check.py — сквозная проверка ролей и статусов (41 проверка)
+tools/          make_diagrams.py, build_sqlite.py, seed_demo.py, api_checks.py
 ```
 
 ## Проверка
@@ -85,13 +159,26 @@ tools/          make_diagrams.py, build_sqlite.py — генерация арт�
 При запущенном приложении (`docker compose up -d`):
 
 ```bash
-python tests/e2e_check.py   # 26 автоматических проверок по всем ролям
+python tests/e2e_check.py   # 41 автоматическая проверка по всем ролям и сценариям
 python tools/build_sqlite.py  # пересоздать SQLite-базу и docs/sql_results.txt
 ```
 
+### Демонстрационные данные
+
+Наполнить рабочую БД тестовыми данными (6 пользователей, 5 категорий, 12 заявок
+в разных статусах с комментариями):
+
+```bash
+docker compose exec app python tools/seed_demo.py
+```
+
+Скрипт идемпотентен — повторный запуск не создаёт дубликатов.
+Тестовые пользователи: `olga` (оператор), `igor`/`petr` (исполнители),
+`ivan`/`maria` (заявители) — пароль у всех `<логин>123`.
+
 ## Пример сценария
 
-1. Заявитель подаёт заявку (веб: «+ Новая заявка» или `POST /api/tickets`).
-2. Оператор уточняет категорию и назначает исполнителя (карточка заявки или `PATCH /api/tickets/{number}`).
+1. Заявитель подаёт заявку (веб: «+ Новая заявка» или `POST /api/requests`).
+2. Оператор уточняет категорию и назначает исполнителя (карточка заявки или `PATCH /api/requests/{number}`).
 3. Исполнитель берёт заявку в работу, затем отмечает выполнение с комментарием.
 4. Заявитель проверяет результат и закрывает заявку.

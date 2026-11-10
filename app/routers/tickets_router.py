@@ -5,7 +5,7 @@ from .. import models, schemas
 from ..auth import get_current_user
 from ..database import get_db
 
-router = APIRouter(prefix="/tickets", tags=["Заявки"])
+router = APIRouter(prefix="/requests", tags=["Заявки"])
 
 
 def get_ticket_or_404(number: str, db: Session) -> models.Ticket:
@@ -42,26 +42,37 @@ def apply_status(ticket: models.Ticket, new_status: str, by_role: str):
     ticket.status = new_status
 
 
-@router.get("", response_model=list[schemas.TicketOut])
+@router.get("", response_model=list[schemas.TicketOut], summary="Список заявок (фильтры: status, category_id, priority, q)")
 def list_tickets(
     status: str | None = Query(default=None, description="Код статуса: new/in_work/done/closed"),
     category_id: int | None = None,
+    priority: str | None = Query(default=None, description="Код приоритета: low/medium/high"),
+    q: str | None = Query(default=None, description="Поиск по номеру, теме и описанию"),
     user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    q = db.query(models.Ticket)
+    q_ = db.query(models.Ticket)
     if user.role == models.Role.APPLICANT:
-        q = q.filter(models.Ticket.applicant_id == user.id)
+        q_ = q_.filter(models.Ticket.applicant_id == user.id)
     elif user.role == models.Role.EXECUTOR:
-        q = q.filter(models.Ticket.executor_id == user.id)
+        q_ = q_.filter(models.Ticket.executor_id == user.id)
     if status:
-        q = q.filter(models.Ticket.status == status)
+        q_ = q_.filter(models.Ticket.status == status)
     if category_id:
-        q = q.filter(models.Ticket.category_id == category_id)
-    return q.order_by(models.Ticket.created_at.desc()).all()
+        q_ = q_.filter(models.Ticket.category_id == category_id)
+    if priority:
+        q_ = q_.filter(models.Ticket.priority == priority)
+    if q:
+        like = f"%{q.strip()}%"
+        q_ = q_.filter(
+            models.Ticket.subject.ilike(like)
+            | models.Ticket.number.ilike(like)
+            | models.Ticket.description.ilike(like)
+        )
+    return q_.order_by(models.Ticket.created_at.desc()).all()
 
 
-@router.post("", response_model=schemas.TicketOut, status_code=201)
+@router.post("", response_model=schemas.TicketOut, status_code=201, summary="Создать заявку")
 def create_ticket(
     data: schemas.TicketCreate,
     user: models.User = Depends(get_current_user),
@@ -76,6 +87,7 @@ def create_ticket(
         subject=data.subject,
         description=data.description,
         category_id=data.category_id,
+        priority=data.priority,
         applicant_id=user.id,
         status=models.Status.NEW,
     )
@@ -87,7 +99,7 @@ def create_ticket(
     return ticket
 
 
-@router.get("/{number}", response_model=schemas.TicketOut)
+@router.get("/{number}", response_model=schemas.TicketOut, summary="Получить заявку по номеру", responses={404: {"description": "Заявка не найдена"}})
 def get_ticket(
     number: str,
     user: models.User = Depends(get_current_user),
@@ -98,7 +110,7 @@ def get_ticket(
     return ticket
 
 
-@router.patch("/{number}", response_model=schemas.TicketOut)
+@router.patch("/{number}", response_model=schemas.TicketOut, summary="Изменить заявку (права зависят от роли)", responses={404: {"description": "Заявка не найдена"}, 422: {"description": "Ошибка валидации"}})
 def update_ticket(
     number: str,
     data: schemas.TicketPatch,
@@ -118,6 +130,8 @@ def update_ticket(
             if not db.get(models.Category, data.category_id):
                 raise HTTPException(400, "Категория не найдена")
             ticket.category_id = data.category_id
+        if data.priority is not None:
+            ticket.priority = data.priority
         if data.executor_id is not None:
             ticket.executor_id = _validate_executor(db, data.executor_id)
         if data.status is not None:
@@ -131,6 +145,9 @@ def update_ticket(
             if not db.get(models.Category, data.category_id):
                 raise HTTPException(400, "Категория не найдена")
             ticket.category_id = data.category_id
+            changed = True
+        if data.priority is not None:
+            ticket.priority = data.priority
             changed = True
         if data.executor_id is not None:
             ticket.executor_id = _validate_executor(db, data.executor_id)
@@ -153,7 +170,8 @@ def update_ticket(
             ticket.description += "\n\n[Дополнено заявителем] " + data.description
             changed = True
         if data.subject is not None or data.category_id is not None \
-                or data.executor_id is not None or data.status is not None:
+                or data.executor_id is not None or data.status is not None \
+                or data.priority is not None:
             raise HTTPException(403, "Заявитель может только дополнять описание и комментарии")
 
     elif user.role == models.Role.EXECUTOR:
@@ -161,7 +179,7 @@ def update_ticket(
             raise HTTPException(403, "Заявка не назначена вам")
         if data.subject is not None or data.description is not None \
                 or data.category_id is not None or data.executor_id is not None \
-                or data.status is not None:
+                or data.status is not None or data.priority is not None:
             raise HTTPException(403, "Используйте действия: взять в работу, выполнить, комментарий")
 
     if data.comment:
@@ -181,7 +199,7 @@ def _validate_executor(db: Session, executor_id: int) -> int:
     return executor_id
 
 
-@router.post("/{number}/take", response_model=schemas.TicketOut)
+@router.post("/{number}/take", response_model=schemas.TicketOut, summary="Взять заявку в работу (исполнитель)")
 def take_ticket(
     number: str,
     user: models.User = Depends(get_current_user),
@@ -200,7 +218,7 @@ def take_ticket(
     return ticket
 
 
-@router.post("/{number}/complete", response_model=schemas.TicketOut)
+@router.post("/{number}/complete", response_model=schemas.TicketOut, summary="Отметить заявку выполненной (исполнитель)")
 def complete_ticket(
     number: str,
     data: schemas.CommentCreate | None = None,
@@ -223,7 +241,7 @@ def complete_ticket(
     return ticket
 
 
-@router.post("/{number}/close", response_model=schemas.TicketOut)
+@router.post("/{number}/close", response_model=schemas.TicketOut, summary="Закрыть выполненную заявку")
 def close_ticket(
     number: str,
     user: models.User = Depends(get_current_user),
@@ -242,7 +260,21 @@ def close_ticket(
     return ticket
 
 
-@router.post("/{number}/comments", response_model=schemas.CommentOut, status_code=201)
+@router.delete("/{number}", status_code=204, summary="Удалить заявку (только администратор)", responses={403: {"description": "Недостаточно прав"}, 404: {"description": "Заявка не найдена"}})
+def delete_ticket(
+    number: str,
+    user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Удаление заявки (только администратор). Комментарии удаляются каскадно."""
+    if user.role != models.Role.ADMIN:
+        raise HTTPException(403, "Удалять заявки может только администратор")
+    ticket = get_ticket_or_404(number, db)
+    db.delete(ticket)
+    db.commit()
+
+
+@router.post("/{number}/comments", response_model=schemas.CommentOut, status_code=201, summary="Добавить комментарий к заявке")
 def add_comment(
     number: str,
     data: schemas.CommentCreate,

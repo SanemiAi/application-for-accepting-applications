@@ -31,6 +31,12 @@
       <option value="{{ c.id }}" {% if ticket.category_id == c.id %}selected{% endif %}>{{ c.name }}</option>
       {% endfor %}
     </select>
+    <label>Приоритет</label>
+    <select name="priority">
+      {% for code, label in priorities.items() %}
+      <option value="{{ code }}" {% if ticket.priority == code %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
     <label>Описание</label>
     <textarea name="description" required>{{ ticket.description }}</textarea>
     <button type="submit">Сохранить</button>

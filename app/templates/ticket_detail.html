@@ -10,6 +10,7 @@
 <div class="card">
   <h2>{{ ticket.number }} — {{ ticket.subject }}</h2>
   <div class="field"><b>Статус:</b> <span class="badge {{ ticket.status }}">{{ labels[ticket.status] }}</span></div>
+  <div class="field"><b>Приоритет:</b> <span class="badge prio_{{ ticket.priority }}">{{ priorities[ticket.priority] }}</span></div>
   <div class="field"><b>Категория:</b> {{ ticket.category.name if ticket.category else "—" }}</div>
   <div class="field"><b>Заявитель:</b> {{ ticket.applicant.full_name or ticket.applicant.username }}</div>
   <div class="field"><b>Исполнитель:</b> {{ ticket.executor.full_name if ticket.executor else "не назначен" }}</div>
@@ -61,6 +62,13 @@
   <form method="post" action="/tickets/{{ ticket.number }}/close"
         onsubmit="return confirm('Закрыть заявку? Это действие нельзя отменить.')">
     <button class="btn-red" type="submit">Закрыть заявку</button>
+  </form>
+  {% endif %}
+
+  {% if user.role == "admin" %}
+  <form method="post" action="/tickets/{{ ticket.number }}/delete" style="margin-top:10px"
+        onsubmit="return confirm('УДАЛИТЬ заявку {{ ticket.number }} безвозвратно вместе с комментариями?')">
+    <button class="btn-red" type="submit">Удалить заявку</button>
   </form>
   {% endif %}
 

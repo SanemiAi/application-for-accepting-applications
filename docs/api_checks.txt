@@ -1,0 +1,262 @@
+Проверка REST API — ЛР №7
+======================================================================
+
+### 1. Авторизация (получение JWT)
+curl -X POST http://localhost:8000/api/auth/login \
+  -d "username=admin" -d "password=admin123"
+-> HTTP 200, получен access_token
+
+### 2. GET /requests — список заявок
+curl -X GET http://localhost:8000/api/requests \
+  -H "Authorization: Bearer $TOKEN"
+-> HTTP 200 [OK ожидали 200]
+[
+ {
+  "number": "З-000012",
+  "subject": "Доступ к 1С для нового бухгалтера",
+  "description": "Создать учётную запись и выдать права чтения.",
+  "created_at": "2026-11-09T23:53:33.029570",
+  "status": "new",
+  "status_label": "Новая",
+  "priority": "high",
+  "priority_label": "Высокий",
+  "category_name": "Административный вопрос",
+  "executor_name": null,
+  "applicant_name": "Мария Кузнецова",
+
+  ... (усечено)
+
+### 3. GET /requests с фильтрами и поиском
+curl -X GET http://localhost:8000/api/requests?status=new&priority=high&q=1С \
+  -H "Authorization: Bearer $TOKEN"
+-> HTTP 200 [OK ожидали 200]
+[
+ {
+  "number": "З-000012",
+  "subject": "Доступ к 1С для нового бухгалтера",
+  "description": "Создать учётную запись и выдать права чтения.",
+  "created_at": "2026-11-09T23:53:33.029570",
+  "status": "new",
+  "status_label": "Новая",
+  "priority": "high",
+  "priority_label": "Высокий",
+  "category_name": "Административный вопрос",
+  "executor_name": null,
+  "applicant_name": "Мария Кузнецова",
+
+  ... (усечено)
+
+### 4. POST /requests — создание заявки
+curl -X POST http://localhost:8000/api/requests \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"subject": "Тестовая заявка API", "description": "Создана из api_checks.py", "priority": "low", "category_id": 1}'
+-> HTTP 201, создана З-000015
+{
+ "number": "З-000015",
+ "subject": "Тестовая заявка API",
+ "description": "Создана из api_checks.py",
+ "created_at": "2026-11-09T23:57:20.731698",
+ "status": "new",
+ "status_label": "Новая",
+ "priority": "low",
+ "priority_label": "Низкий",
+ "category_name": "Техподдержка",
+ "executor_name": null,
+ "applicant_name": "Администратор",
+ "comments": []
+}
+
+### 5. GET /requests/З-000015 — одна заявка
+curl -X GET http://localhost:8000/api/requests/З-000015 \
+  -H "Authorization: Bearer $TOKEN"
+-> HTTP 200 [OK ожидали 200]
+{
+ "number": "З-000015",
+ "subject": "Тестовая заявка API",
+ "description": "Создана из api_checks.py",
+ "created_at": "2026-11-09T23:57:20.731698",
+ "status": "new",
+ "status_label": "Новая",
+ "priority": "low",
+ "priority_label": "Низкий",
+ "category_name": "Техподдержка",
+ "executor_name": null,
+ "applicant_name": "Администратор",
+ "comments": []
+}
+
+### 6. GET /requests/З-999999 — несуществующая -> 404
+curl -X GET http://localhost:8000/api/requests/З-999999 \
+  -H "Authorization: Bearer $TOKEN"
+-> HTTP 404 [OK ожидали 404]
+{
+ "detail": "Заявка З-999999 не найдена"
+}
+
+### 7. PATCH /requests/З-000015 — смена приоритета
+curl -X PATCH http://localhost:8000/api/requests/З-000015 \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"priority": "high"}'
+-> HTTP 200 [OK ожидали 200]
+{
+ "number": "З-000015",
+ "subject": "Тестовая заявка API",
+ "description": "Создана из api_checks.py",
+ "created_at": "2026-11-09T23:57:20.731698",
+ "status": "new",
+ "status_label": "Новая",
+ "priority": "high",
+ "priority_label": "Высокий",
+ "category_name": "Техподдержка",
+ "executor_name": null,
+ "applicant_name": "Администратор",
+ "comments": []
+}
+
+### 8. POST /requests с невалидными данными -> 422
+curl -X POST http://localhost:8000/api/requests \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"subject": "xy"}'
+-> HTTP 422 [OK ожидали 422]
+{
+ "detail": "Ошибка валидации данных",
+ "errors": [
+  {
+   "field": "subject",
+   "message": "String should have at least 3 characters"
+  },
+  {
+   "field": "description",
+   "message": "Field required"
+  }
+ ]
+}
+
+### 9. POST /requests/З-000015/comments — комментарий
+curl -X POST http://localhost:8000/api/requests/З-000015/comments \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Комментарий через API"}'
+-> HTTP 201 [OK ожидали 201]
+{
+ "id": 14,
+ "text": "Комментарий через API",
+ "created_at": "2026-11-09T23:57:20.763768",
+ "author_name": "Администратор"
+}
+
+### 10. GET /statuses — справочник статусов
+curl -X GET http://localhost:8000/api/statuses \
+  -H "Authorization: Bearer $TOKEN"
+-> HTTP 200 [OK ожидали 200]
+{
+ "statuses": [
+  {
+   "code": "new",
+   "label": "Новая"
+  },
+  {
+   "code": "in_work",
+   "label": "В работе"
+  },
+  {
+   "code": "done",
+   "label": "Выполнена"
+  },
+  {
+   "code": "closed",
+   "label": "Закрыта"
+  }
+ ],
+ "transitions": {
+  "new": [
+   "in_work"
+  ],
+  "in_work": [
+   "done"
+  ],
+  "done": [
+   "closed"
+  ],
+  "closed": []
+ }
+}
+
+### 11. GET /categories — справочник категорий
+curl -X GET http://localhost:8000/api/categories \
+  -H "Authorization: Bearer $TOKEN"
+-> HTTP 200 [OK ожидали 200]
+[
+ {
+  "id": 3,
+  "name": "Административный вопрос"
+ },
+ {
+  "id": 5,
+  "name": "ИТ-оборудование"
+ },
+ {
+  "id": 4,
+  "name": "Кадровый вопрос"
+ },
+ {
+  "id": 2,
+  "name": "Снабжение"
+ },
+ {
+  "id": 1,
+  "name": "Техподдержка"
+ }
+]
+
+### 12. GET /users — список пользователей (admin)
+curl -X GET http://localhost:8000/api/users \
+  -H "Authorization: Bearer $TOKEN"
+-> HTTP 200 [OK ожидали 200]
+[
+ {
+  "id": 1,
+  "username": "admin",
+  "full_name": "Администратор",
+  "role": "admin"
+ },
+ {
+  "id": 2,
+  "username": "olga",
+  "full_name": "Ольга Сидорова",
+  "role": "operator"
+ },
+ {
+  "id": 3,
+  "username": "igor",
+  "full_name": "Игорь Мастеров",
+  "role": "executor"
+ },
+ {
+  "id": 4,
+  "username": "petr",
+  "full_name": "Пётр Ремонтников",
+  "role": "executor"
+ },
+ {
+  "id": 5,
+  "userna
+  ... (усечено)
+
+### 13. GET /users без токена -> 401
+curl -X GET http://localhost:8000/api/users
+-> HTTP 401 [OK ожидали 401]
+{
+ "detail": "Not authenticated"
+}
+
+### 14. DELETE /requests/З-000015 — удаление -> 204
+curl -X DELETE http://localhost:8000/api/requests/З-000015 \
+  -H "Authorization: Bearer $TOKEN"
+-> HTTP 204 [OK ожидали 204]
+null
+
+Выполнено запросов: 13

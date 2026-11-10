@@ -10,7 +10,7 @@
 
 <div class="card">
   <form method="get" action="/" class="filters">
-    <input type="text" name="q" value="{{ f_q }}" placeholder="Поиск по номеру или теме...">
+    <input type="text" name="q" value="{{ f_q }}" placeholder="Поиск по номеру, теме или описанию...">
     <select name="status">
       <option value="">Все статусы</option>
       {% for code, label in labels.items() %}
@@ -23,6 +23,12 @@
       <option value="{{ c.id }}" {% if f_category_id == c.id %}selected{% endif %}>{{ c.name }}</option>
       {% endfor %}
     </select>
+    <select name="priority">
+      <option value="">Любой приоритет</option>
+      {% for code, label in priorities.items() %}
+      <option value="{{ code }}" {% if f_priority == code %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
     <button type="submit">Найти</button>
     <a class="btn btn-gray" href="/">Сбросить</a>
   </form>
@@ -31,13 +37,14 @@
 {% if tickets %}
 <table>
   <tr>
-    <th>Номер</th><th>Тема</th><th>Категория</th><th>Статус</th><th>Подана</th><th>Исполнитель</th>
+    <th>Номер</th><th>Тема</th><th>Категория</th><th>Приоритет</th><th>Статус</th><th>Подана</th><th>Исполнитель</th>
   </tr>
   {% for t in tickets %}
   <tr>
     <td><a href="/tickets/{{ t.number }}">{{ t.number }}</a></td>
     <td>{{ t.subject }}</td>
     <td>{{ t.category.name if t.category else "—" }}</td>
+    <td><span class="badge prio_{{ t.priority }}">{{ priorities[t.priority] }}</span></td>
     <td><span class="badge {{ t.status }}">{{ labels[t.status] }}</span></td>
     <td class="muted">{{ t.created_at.strftime("%d.%m.%Y %H:%M") }}</td>
     <td>{{ t.executor.full_name if t.executor else "—" }}</td>
@@ -46,7 +53,7 @@
 </table>
 {% else %}
 <div class="card">
-  {% if f_q or f_status or f_category_id %}
+  {% if f_q or f_status or f_category_id or f_priority %}
   <p class="muted">По заданным условиям ничего не найдено. <a href="/">Сбросить фильтры</a></p>
   {% else %}
   <p class="muted">Заявок пока нет.</p>

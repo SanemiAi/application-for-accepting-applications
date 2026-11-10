@@ -1,0 +1,26 @@
+# Git
+.git
+.gitignore
+
+# Секреты
+.env
+
+# Python-кэш и окружения
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+.pytest_cache/
+
+# IDE
+.idea/
+.vscode/
+
+# ОС
+.DS_Store
+Thumbs.db
+*.log
+
+# Случайно сохранённые страницы браузера
+Вход — Система заявок.html

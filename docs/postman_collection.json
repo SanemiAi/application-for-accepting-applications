@@ -1,0 +1,438 @@
+{
+  "info": {
+    "name": "Система учёта заявок — REST API (ЛР7)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000"
+    },
+    {
+      "key": "token",
+      "value": "<вставьте access_token из /api/auth/login>"
+    }
+  ],
+  "item": [
+    {
+      "name": "Логин (получить токен)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/auth/login",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "auth",
+            "login"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Список заявок",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/requests",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "requests"
+          ]
+        },
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Список с фильтрами",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/requests?status=new&priority=high&q=1С",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "requests?status=new&priority=high&q=1С"
+          ]
+        },
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Создать заявку",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/requests",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "requests"
+          ]
+        },
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"subject\": \"Тема заявки\",\n  \"description\": \"Описание\",\n  \"priority\": \"medium\",\n  \"category_id\": 1\n}"
+        }
+      }
+    },
+    {
+      "name": "Получить заявку",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/requests/З-000001",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "requests",
+            "З-000001"
+          ]
+        },
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Изменить заявку",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/requests/З-000001",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "requests",
+            "З-000001"
+          ]
+        },
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"priority\": \"high\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Взять в работу",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/requests/З-000001/take",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "requests",
+            "З-000001",
+            "take"
+          ]
+        },
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Отметить выполненной",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/requests/З-000001/complete",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "requests",
+            "З-000001",
+            "complete"
+          ]
+        },
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Закрыть заявку",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/requests/З-000001/close",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "requests",
+            "З-000001",
+            "close"
+          ]
+        },
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Комментарий",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/requests/З-000001/comments",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "requests",
+            "З-000001",
+            "comments"
+          ]
+        },
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"text\": \"Текст\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Удалить заявку",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/requests/З-000001",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "requests",
+            "З-000001"
+          ]
+        },
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Статусы",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/statuses",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "statuses"
+          ]
+        },
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Приоритеты",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/priorities",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "priorities"
+          ]
+        },
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Категории",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/categories",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "categories"
+          ]
+        },
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Пользователи (admin)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/users",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "users"
+          ]
+        },
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

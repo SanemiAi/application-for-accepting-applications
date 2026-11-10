@@ -29,7 +29,10 @@ def api(method, path, token=None, data=None, form=None):
         req.add_header("Content-Type", "application/x-www-form-urlencoded")
     try:
         with urllib.request.urlopen(req, body) as r:
-            return r.status, json.loads(r.read()) if r.headers.get("Content-Type", "").startswith("application/json") else r.read()
+            raw = r.read()
+            if r.headers.get("Content-Type", "").startswith("application/json") and raw:
+                return r.status, json.loads(raw)
+            return r.status, raw
     except urllib.error.HTTPError as e:
         raw = e.read()
         try:
@@ -90,13 +93,22 @@ for u, p, n, r in [("ivan", "ivan123", "Иван Петров", "applicant"),
 st, users = api("GET", "/admin/users", token=admin)
 uid = {u["username"]: u["id"] for u in users}
 
-print("== 3. Заявитель создаёт заявку (API) ==")
+print("== 3. Заявитель создаёт заявку (API, с приоритетом) ==")
 st, tk = api("POST", "/auth/login", form={"username": "ivan", "password": "ivan123"})
 ivan = tk["access_token"]
-st, t = api("POST", "/tickets", token=ivan,
-            data={"subject": "Не работает принтер", "description": "Принтер HP в бухгалтерии не печатает.", "category_id": cats[0]["id"]})
+st, t = api("POST", "/requests", token=ivan,
+            data={"subject": "Не работает принтер", "description": "Принтер HP в бухгалтерии не печатает.",
+                  "category_id": cats[0]["id"], "priority": "high"})
 check("Заявка создана, номер присвоен", st == 201 and t["number"].startswith("З-"), t)
+check("Приоритет сохранён", t.get("priority") == "high" and t.get("priority_label") == "Высокий", t.get("priority"))
 num = t["number"]
+
+st, res = api("POST", "/requests", token=ivan,
+              data={"subject": "аб", "description": "короткая тема"})
+check("Валидация: короткая тема -> 422", st == 422, st)
+st, res = api("POST", "/requests", token=ivan,
+              data={"subject": "Нормальная тема", "description": "описание", "priority": "super"})
+check("Валидация: неверный приоритет -> 422", st == 422, st)
 
 print("== 4. Веб: фильтры и поиск ==")
 adm_cookie = web_login("admin", "admin123")
@@ -107,6 +119,12 @@ st, _, html = web("GET", "/?status=closed", cookie=adm_cookie)
 check("Фильтр по статусу: closed пуст", st == 200 and num not in html)
 st, _, html = web("GET", "/?q=принтер", cookie=adm_cookie)
 check("Поиск по теме находит заявку", st == 200 and num in html)
+st, _, html = web("GET", "/?q=бухгалтерии", cookie=adm_cookie)
+check("Поиск по описанию находит заявку", st == 200 and num in html)
+st, _, html = web("GET", "/?priority=high&status=new", cookie=adm_cookie)
+check("Фильтр по приоритету работает", st == 200 and num in html)
+st, _, html = web("GET", "/?priority=low&status=new", cookie=adm_cookie)
+check("Фильтр по приоритету: low не содержит high-заявку", st == 200 and num not in html)
 st, _, html = web("GET", "/?q=несуществующийтекст", cookie=adm_cookie)
 check("Поиск: пустое состояние", st == 200 and "ничего не найдено" in html)
 
@@ -123,7 +141,7 @@ st, _, html = web("GET", f"/tickets/{num}/edit", cookie=olga_cookie)
 check("Страница редактирования открывается", st == 200 and "Редактирование" in html)
 st, _, _ = web("POST", f"/tickets/{num}/edit", cookie=olga_cookie,
                form={"subject": "Не работает принтер HP LaserJet", "description": "Принтер HP LaserJet в бухгалтерии не печатает. Уточнено оператором.", "category_id": str(cats[0]["id"])})
-st, t = api("GET", f"/tickets/{num}", token=admin)
+st, t = api("GET", f"/requests/{num}", token=admin)
 check("Тема уточнена оператором", t["subject"] == "Не работает принтер HP LaserJet", t["subject"])
 
 print("== 7. Исполнитель берёт в работу и выполняет (веб) ==")
@@ -132,32 +150,53 @@ check("Веб-логин исполнителя", igor_cookie is not None)
 st, _, html = web("GET", "/", cookie=igor_cookie)
 check("Исполнитель видит назначенную заявку", num in html)
 st, _, _ = web("POST", f"/tickets/{num}/take", cookie=igor_cookie)
-st, t = api("GET", f"/tickets/{num}", token=admin)
+st, t = api("GET", f"/requests/{num}", token=admin)
 check("Статус 'В работе'", t["status"] == "in_work", t["status"])
 st, _, _ = web("POST", f"/tickets/{num}/complete", cookie=igor_cookie, form={"text": "Заменён картридж, принтер работает."})
-st, t = api("GET", f"/tickets/{num}", token=admin)
+st, t = api("GET", f"/requests/{num}", token=admin)
 check("Статус 'Выполнена'", t["status"] == "done", t["status"])
 
 print("== 8. Заявитель дополняет описание и закрывает (веб) ==")
 ivan_cookie = web_login("ivan", "ivan123")
 st, _, _ = web("POST", f"/tickets/{num}/edit", cookie=ivan_cookie, form={"description": "Проверил печать — всё работает, спасибо!"})
-st, t = api("GET", f"/tickets/{num}", token=admin)
+st, t = api("GET", f"/requests/{num}", token=admin)
 check("Описание дополнено заявителем", "[Дополнено заявителем]" in t["description"])
 st, _, _ = web("POST", f"/tickets/{num}/close", cookie=ivan_cookie)
-st, t = api("GET", f"/tickets/{num}", token=admin)
+st, t = api("GET", f"/requests/{num}", token=admin)
 check("Заявка закрыта заявителем", t["status"] == "closed", t["status"])
 
 print("== 9. Запрещённые переходы и доступ ==")
 st, _, html = web("POST", f"/tickets/{num}/complete", cookie=igor_cookie)
 st2, _, html2 = web("GET", f"/tickets/{num}?error=x", cookie=igor_cookie)
-st, t = api("GET", f"/tickets/{num}", token=admin)
+st, t = api("GET", f"/requests/{num}", token=admin)
 check("Закрытую нельзя выполнить снова", t["status"] == "closed")
-st, res = api("GET", f"/tickets/{num}", token=None)
+st, res = api("GET", f"/requests/{num}", token=None)
 check("Без токена API -> 401", st == 401, st)
 st, h, html = web("GET", f"/tickets/{num}", cookie=igor_cookie)
 check("Исполнитель видит свою закрытую заявку", st == 200 and num in html)
 st, tk = api("POST", "/auth/login", form={"username": "ivan", "password": "ivan123"})
 st, res = api("GET", "/admin/users", token=tk["access_token"])
 check("Заявителю запрещён /admin -> 403", st == 403, st)
+
+print("== 10. Страницы ошибок и удаление ==")
+st, _, html = web("GET", "/tickets/З-999999", cookie=adm_cookie)
+check("Несуществующая заявка -> HTML 404", st == 404 and "не найдена" in html.lower(), st)
+st, res = api("DELETE", f"/requests/{num}", token=tk["access_token"])
+check("Удаление заявителем -> 403", st == 403, st)
+st, res = api("DELETE", f"/requests/{num}", token=admin)
+check("Удаление администратором -> 204", st == 204, st)
+st, res = api("GET", f"/requests/{num}", token=admin)
+check("Удалённая заявка не находится -> 404", st == 404, st)
+st, res = api("DELETE", f"/requests/{num}", token=admin)
+check("Повторное удаление -> 404", st == 404, st)
+
+print("== 11. Тестовые данные (ЛР6): >=10 заявок, >=4 пользователей ==")
+st, lst = api("GET", "/requests", token=admin)
+check(f"Заявок >= 10 (сейчас {len(lst)})", len(lst) >= 10, len(lst))
+st, users = api("GET", "/admin/users", token=admin)
+check(f"Пользователей >= 4 (сейчас {len(users)})", len(users) >= 4, len(users))
+check("Категорий >= 4", len(cats) >= 4, len(cats))
+statuses = {t["status"] for t in lst}
+check(f"Несколько статусов в данных ({sorted(statuses)})", len(statuses) >= 3, statuses)
 
 print(f"\nИТОГ: {ok} passed, {fail} failed")
