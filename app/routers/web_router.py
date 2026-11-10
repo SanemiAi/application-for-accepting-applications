@@ -94,7 +94,7 @@ def _back(number: str, error: str | None = None) -> RedirectResponse:
 def index(
     request: Request,
     status: Optional[str] = None,
-    category_id: Optional[int] = None,
+    category_id: Optional[str] = None,
     priority: Optional[str] = None,
     q: Optional[str] = None,
     user: Optional[models.User] = Depends(get_web_user),
@@ -102,6 +102,9 @@ def index(
 ):
     if not user:
         return RedirectResponse("/login")
+    cat_id = None
+    if category_id and category_id.strip().isdigit():
+        cat_id = int(category_id)
     query = db.query(models.Ticket)
     if user.role == models.Role.APPLICANT:
         query = query.filter(models.Ticket.applicant_id == user.id)
@@ -109,8 +112,8 @@ def index(
         query = query.filter(models.Ticket.executor_id == user.id)
     if status in models.Status.ALL:
         query = query.filter(models.Ticket.status == status)
-    if category_id:
-        query = query.filter(models.Ticket.category_id == category_id)
+    if cat_id:
+        query = query.filter(models.Ticket.category_id == cat_id)
     if priority in models.Priority.ALL:
         query = query.filter(models.Ticket.priority == priority)
     if q:
@@ -127,7 +130,7 @@ def index(
         "tickets.html",
         ctx(user, tickets=tickets, labels=models.Status.LABELS,
             priorities=models.Priority.LABELS,
-            categories=categories, f_status=status, f_category_id=category_id,
+            categories=categories, f_status=status, f_category_id=cat_id,
             f_priority=priority, f_q=q or ""),
     )
 
